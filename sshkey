@@ -1,0 +1,82 @@
+#!/bin/bash
+# SSHKey - SSH key generator and manager
+# Generate, list, and manage SSH keys
+
+set -e
+
+KEY_TYPE="ed25519"
+KEY_PATH=""
+COMMENT=""
+PASSPHRASE=""
+
+usage() {
+    cat << EOF
+SSHKey - SSH Key Generator & Manager
+
+USAGE:
+    sshkey [options] [command]
+
+COMMANDS:
+    gen          Generate new key
+    list         List existing keys
+    fingerprint Show key fingerprints
+
+OPTIONS:
+    -t, --type <TYPE>     Key type: rsa, ed25519, ecdsa (default: ed25519)
+    -f, --file <PATH>     Key file path
+    -c, --comment <CMT>  Key comment
+    -p, --passphrase      Set passphrase (interactive)
+    -h, --help            Show help
+
+EXAMPLES:
+    sshkey gen -t ed25519 -f ~/.ssh/mykey
+    sshkey list
+    sshkey fingerprint -f ~/.ssh/id_ed25519
+
+EOF
+}
+
+gen_key() {
+    local type_flag=""
+    case "$KEY_TYPE" in
+        rsa) type_flag="-t rsa -b 4096" ;;
+        ed25519) type_flag="-t ed25519" ;;
+        ecdsa) type_flag="-t ecdsa" ;;
+    esac
+
+    local key_file="${KEY_PATH:-$HOME/.ssh/id_$KEY_TYPE}"
+    local comment_flag=""
+    [[ -n "$COMMENT" ]] && comment_flag="-C '$COMMENT'"
+
+    echo "🔑 Generating $KEY_TYPE key: $key_file"
+    ssh-keygen -f "$key_file" $type_flag $comment_flag -N "${PASSPHRASE:-}"
+    echo "✅ Key generated: $key_file.pub"
+}
+
+list_keys() {
+    echo "📁 SSH Keys"
+    echo "==========="
+    ls -la "$HOME/.ssh/"*.pub 2>/dev/null | while read line; do
+        echo "  $line"
+    done
+}
+
+show_fingerprint() {
+    local key="${KEY_PATH:-$HOME/.ssh/id_ed25519}"
+    if [[ ! -f "$key" ]]; then
+        key="${KEY_PATH:-$HOME/.ssh/id_rsa}"
+    fi
+    if [[ ! -f "$key" ]]; then
+        echo "❌ Key not found"
+        return
+    fi
+    ssh-keygen -lf "$key"
+}
+
+case "${1:-gen}" in
+    gen) gen_key ;;
+    list) list_keys ;;
+    fingerprint) show_fingerprint ;;
+    *) usage ;;
+esac
+EOF
